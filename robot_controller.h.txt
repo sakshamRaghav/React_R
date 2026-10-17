@@ -1,0 +1,68 @@
+
+
+#ifndef ROBOT_CONTROLLER_H
+#define ROBOT_CONTROLLER_H
+
+#include "decision_engine.h"
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+class RobotController {
+public:
+
+    // speed for each action (metres per second)
+    static constexpr double SPEED_FULL = 0.5;  // PROCEED
+    static constexpr double SPEED_SLOW = 0.2;  // SLOW_DOWN
+    static constexpr double SPEED_STOP = 0.0;  // STOP
+
+    // the robot starts stopped
+    RobotController()
+        : current_speed(SPEED_STOP),
+          current_action(RobotAction::STOP)
+    {}
+
+    // set the speed that matches the action
+    void execute(RobotAction action) {
+        current_action = action;
+
+        switch (action) {
+            case RobotAction::PROCEED:
+                current_speed = SPEED_FULL;
+                break;
+            case RobotAction::SLOW_DOWN:
+                current_speed = SPEED_SLOW;
+                break;
+            case RobotAction::STOP:
+                current_speed = SPEED_STOP;
+                break;
+            default:
+                // unexpected action, safest thing is to stop
+                cerr << "Unknown action, stopping to be safe.\n";
+                current_speed = SPEED_STOP;
+                break;
+        }
+    }
+
+    double getCurrentSpeed() const {
+        return current_speed;
+    }
+
+    RobotAction getCurrentAction() const {
+        return current_action;
+    }
+
+    void printState() const {
+        cout << "\n--- Motor Command ---\n";
+        cout << "  Action : " << actionToString(current_action) << "\n";
+        cout << "  Speed  : " << current_speed << " m/s\n";
+        cout << "---------------------\n";
+    }
+
+private:
+    double      current_speed;
+    RobotAction current_action;
+};
+
+#endif
