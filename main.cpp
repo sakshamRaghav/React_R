@@ -1,0 +1,97 @@
+
+
+#include "robot_controller.h"
+#include <iostream>
+
+using namespace std;
+
+// register the 4 sensors (the same setup for every test)
+void setupSensors(SensorMonitor& sensors) {
+    sensors.registerSensor(1, SensorDirection::FRONT, 0.05, 5.0);
+    sensors.registerSensor(2, SensorDirection::REAR,  0.05, 5.0);
+    sensors.registerSensor(3, SensorDirection::LEFT,  0.05, 5.0);
+    sensors.registerSensor(4, SensorDirection::RIGHT, 0.05, 5.0);
+}
+
+// run the whole chain once: sensors -> risk -> decision -> robot
+void runChain(SensorMonitor& sensors, RiskAssessment& risk,
+              DecisionEngine& decision, RobotController& robot) {
+    sensors.printStatus();
+    risk.printReport(sensors);
+
+    RiskLevel level = risk.evaluate(sensors);
+    decision.printDecision(level);
+
+    robot.execute(decision.decide(level));
+    robot.printState();
+}
+
+int main() {
+
+    SensorMonitor   sensors;
+    RiskAssessment  risk;
+    DecisionEngine  decision;
+    RobotController robot;
+
+    cout << "\n--- Test 1: All Clear ---\n";
+    setupSensors(sensors);
+    sensors.updateReading(1, 2.50, 1);
+    sensors.updateReading(2, 3.10, 1);
+    sensors.updateReading(3, 1.90, 1);
+    sensors.updateReading(4, 4.00, 1);
+    runChain(sensors, risk, decision, robot);
+
+    cout << "\n--- Test 2: Obstacle Nearby ---\n";
+    setupSensors(sensors);
+    sensors.updateReading(1, 0.60, 2);
+    sensors.updateReading(2, 3.10, 2);
+    sensors.updateReading(3, 2.20, 2);
+    sensors.updateReading(4, 1.80, 2);
+    runChain(sensors, risk, decision, robot);
+
+    cout << "\n--- Test 3: Obstacle Too Close ---\n";
+    setupSensors(sensors);
+    sensors.updateReading(1, 0.20, 3);
+    sensors.updateReading(2, 2.50, 3);
+    sensors.updateReading(3, 1.00, 3);
+    sensors.updateReading(4, 1.50, 3);
+    runChain(sensors, risk, decision, robot);
+
+    cout << "\n--- Test 4: Sensor Disconnected ---\n";
+    setupSensors(sensors);
+    sensors.updateReading(1, 1.50, 4);
+    sensors.updateReading(2, 3.00, 4);
+    sensors.updateReading(3, -1.0, 4);   // -1 means no data
+    sensors.updateReading(4, 2.10, 4);
+    runChain(sensors, risk, decision, robot);
+
+    cout << "\n--- Test 5: Sensor Frozen ---\n";
+    setupSensors(sensors);
+    sensors.updateReading(2, 1.80, 10);
+    sensors.updateReading(2, 1.80, 15);  // same value 5 ticks later = frozen
+    sensors.updateReading(1, 1.20, 15);
+    sensors.updateReading(3, 2.40, 15);
+    sensors.updateReading(4, 3.00, 15);
+    runChain(sensors, risk, decision, robot);
+
+    cout << "\n--- Test 6: Lidar sees nothing (empty aisle) ---\n";
+    setupSensors(sensors);
+    sensors.updateReading(1, INFINITY, 20);  // lidar gives infinity = nothing seen
+    sensors.updateReading(2, INFINITY, 20);
+    sensors.updateReading(3, INFINITY, 20);
+    sensors.updateReading(4, INFINITY, 20);
+    runChain(sensors, risk, decision, robot);
+
+    cout << "\n--- Test 7: Full lidar scan ---\n";
+
+    float scan[360];
+    for (int i = 0; i < 360; i++) scan[i] = 4.0f;
+    for (int i = 175; i < 185; i++) scan[i] = 0.5f;   // obstacle straight ahead
+    setupSensors(sensors);
+    sensors.updateFromLidar(scan, 360, 30, 180, true);   // beam 180 = front
+    runChain(sensors, risk, decision, robot);
+
+
+    cout << "\n--- Done ---\n\n";
+    return 0;
+}
