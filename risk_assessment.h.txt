@@ -1,0 +1,102 @@
+
+
+#ifndef RISK_ASSESSMENT_H
+#define RISK_ASSESSMENT_H
+
+#include "sensor_class.h"
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+enum class RiskLevel {
+    LOW,     // path is clear, safe to move
+    MEDIUM,  // something is nearby, be careful
+    HIGH     // something is very close OR a sensor is broken, stop!
+};
+
+inline string riskToString(RiskLevel level) {
+    switch (level) {
+        case RiskLevel::LOW:    return "LOW";
+        case RiskLevel::MEDIUM: return "MEDIUM";
+        case RiskLevel::HIGH:   return "HIGH";
+        default:                return "UNKNOWN";
+    }
+}
+
+
+class RiskAssessment {
+public:
+
+    // change these numbers to make the robot more or less careful
+    static constexpr double HIGH_THRESHOLD   = 0.3;  // 30 cm or closer = HIGH
+    static constexpr double MEDIUM_THRESHOLD = 0.8;  // 80 cm or closer = MEDIUM
+
+    // check all sensors and return the worst risk found
+    RiskLevel evaluate(const SensorMonitor& monitor) const {
+
+        const auto& all_sensors = monitor.getAllSensors();
+
+        // no sensors = we know nothing about the surroundings = HIGH
+        if (all_sensors.empty()) {
+            cout << "No sensors registered, cannot assess risk.\n";
+            return RiskLevel::HIGH;
+        }
+
+        RiskLevel worst = RiskLevel::LOW;
+
+        for (const auto& pair : all_sensors) {
+            RiskLevel r = checkOneSensor(pair.second);
+
+            if (r == RiskLevel::HIGH) {
+                return RiskLevel::HIGH;   // cannot get worse, stop checking
+            }
+            if (r == RiskLevel::MEDIUM) {
+                worst = RiskLevel::MEDIUM;
+            }
+        }
+
+        return worst;
+    }
+
+    // print the risk of each sensor and the overall risk
+    void printReport(const SensorMonitor& monitor) const {
+        cout << "\n--- Risk Report ---\n";
+
+        for (const auto& pair : monitor.getAllSensors()) {
+            const Sensor& s = pair.second;
+            cout << "  Sensor #" << s.id
+                 << " | Side: "   << directionToString(s.direction)
+                 << " | Dist: "   << s.distance << " m"
+                 << " | Health: " << statusToString(s.status)
+                 << " | Risk: "   << riskToString(checkOneSensor(s))
+                 << "\n";
+        }
+
+        cout << "  Overall Risk: " << riskToString(evaluate(monitor)) << "\n";
+        cout << "-------------------\n";
+    }
+
+private:
+
+    // risk of just one sensor
+    RiskLevel checkOneSensor(const Sensor& s) const {
+
+        // a sensor that is not healthy cannot be trusted
+        if (s.status != SensorStatus::OK) {
+            return RiskLevel::HIGH;
+        }
+
+        if (s.distance <= HIGH_THRESHOLD) {
+            return RiskLevel::HIGH;
+        }
+
+        if (s.distance <= MEDIUM_THRESHOLD) {
+            return RiskLevel::MEDIUM;
+        }
+
+        return RiskLevel::LOW;
+    }
+};
+
+#endif
